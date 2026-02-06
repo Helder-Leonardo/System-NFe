@@ -9,9 +9,9 @@ from tkinter import ttk, messagebox
 
 # ================= CONFIGURAÇÕES DE ATUALIZAÇÃO =================
 # Se usar GitHub, a URL deve ser a versão "Raw" do arquivo
-URL_MANIFESTO = "https://seu-servidor.com/nfe_flow/version.json"
-URL_BASE_ARQUIVOS = "https://seu-servidor.com/nfe_flow/files/"
-PASTA_SISTEMA = r"C:\NFe_Flow_Pro"
+URL_MANIFESTO = "https://raw.githubusercontent.com/Helder-Leonardo/System-NFe/refs/heads/main/version.json"
+URL_BASE_ARQUIVOS = "https://raw.githubusercontent.com/Helder-Leonardo/System-NFe/refs/heads/main/main.py"
+PASTA_SISTEMA = r"C:\Users\Windows\Desktop\SystemNFe"
 ARQUIVO_LOCAL_VERSAO = os.path.join(PASTA_SISTEMA, "version.json")
 EXECUTAVEL_FINAL = os.path.join(PASTA_SISTEMA, "main.py") # Pode ser .exe se você compilar
 
