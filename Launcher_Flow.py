@@ -1,54 +1,49 @@
 import os
-import sys
 import json
-import time
 import requests
 import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
+import urllib3
 
-# ================= CONFIGURAÇÕES DE ATUALIZAÇÃO =================
-# Se usar GitHub, a URL deve ser a versão "Raw" do arquivo
+# Desabilita avisos de SSL para evitar erros em computadores sem certificados atualizados
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# ================= CONFIGURAÇÕES =================
 URL_MANIFESTO = "https://raw.githubusercontent.com/Helder-Leonardo/System-NFe/refs/heads/main/version.json"
-URL_BASE_ARQUIVOS = "https://raw.githubusercontent.com/Helder-Leonardo/System-NFe/refs/heads/main/main.py"
+URL_BASE_ARQUIVOS = "https://raw.githubusercontent.com/Helder-Leonardo/System-NFe/refs/heads/main/"
 PASTA_SISTEMA = r"C:\NFe_Flow_Pro"
 ARQUIVO_LOCAL_VERSAO = os.path.join(PASTA_SISTEMA, "version.json")
-EXECUTAVEL_FINAL = os.path.join(PASTA_SISTEMA, "main.py") # Pode ser .exe se você compilar
+EXECUTAVEL_FINAL = os.path.join(PASTA_SISTEMA, "main.exe")
 
 class NFeFlowLauncher:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("NFe Flow Pro - Sincronizador")
-        self.root.geometry("450x200")
+        self.root.title("NFe Flow Pro - Updater")
+        self.root.geometry("400x180")
         self.root.configure(bg="#020617")
-        self.root.resizable(False, False)
-
-        # Estilo da Progressbar
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure("TProgressbar", thickness=10, troughcolor="#0F172A", background="#38BDF8", bordercolor="#020617")
-
-        tk.Label(self.root, text="⚡", font=("Inter", 30), bg="#020617", fg="#38BDF8").pack(pady=(10, 0))
-        tk.Label(self.root, text="NFe FLOW PRO", font=("Montserrat", 12, "bold"), bg="#020617", fg="#F8FAFC").pack()
         
-        self.lbl_status = tk.Label(self.root, text="Iniciando verificação...", font=("Inter", 9), bg="#020617", fg="#94A3B8")
-        self.lbl_status.pack(pady=10)
-
-        self.progress = ttk.Progressbar(self.root, orient="horizontal", length=350, mode="determinate")
-        self.progress.pack(pady=5)
-
-        os.makedirs(PASTA_SISTEMA, exist_ok=True)
+        tk.Label(self.root, text="VERIFICANDO ATUALIZAÇÕES", font=("Arial", 10, "bold"), bg="#020617", fg="#38BDF8").pack(pady=10)
         
-        # Inicia a lógica em background para não travar a janela
-        self.root.after(500, self.checar_atualizacoes)
+        self.lbl_status = tk.Label(self.root, text="Conectando ao servidor...", bg="#020617", fg="#94A3B8")
+        self.lbl_status.pack(pady=5)
+        
+        self.progress = ttk.Progressbar(self.root, length=300, mode="determinate")
+        self.progress.pack(pady=10)
+
+        # Garante que a pasta existe antes de qualquer coisa
+        if not os.path.exists(PASTA_SISTEMA):
+            os.makedirs(PASTA_SISTEMA)
+
+        self.root.after(500, self.sincronizar)
         self.root.mainloop()
 
-    def checar_atualizacoes(self):
+    def sincronizar(self):
         try:
-            # 1. Tenta baixar o manifesto do servidor
-            response = requests.get(URL_MANIFESTO, timeout=10)
+            # 1. Baixa o manifesto do GitHub
+            response = requests.get(URL_MANIFESTO, timeout=10, verify=False)
             if response.status_code != 200:
-                raise Exception("Servidor de atualizações offline.")
+                raise Exception("Não foi possível acessar o servidor de atualização.")
             
             dados_remotos = response.json()
             versao_remota = dados_remotos.get("version", "1.0.0")
@@ -60,60 +55,51 @@ class NFeFlowLauncher:
                 with open(ARQUIVO_LOCAL_VERSAO, 'r') as f:
                     versao_local = json.load(f).get("version", "0.0.0")
 
-            # 3. Verifica se falta algum arquivo físico ou se a versão mudou
-            falta_arquivo = any(not os.path.exists(os.path.join(PASTA_SISTEMA, f)) for f in arquivos_necessarios)
+            # 3. Verifica se falta algum arquivo (como o dados_nfe ou o main.exe)
+            alguem_faltando = any(not os.path.exists(os.path.join(PASTA_SISTEMA, f)) for f in arquivos_necessarios)
 
-            if versao_remota != versao_local or falta_arquivo:
-                self.lbl_status.config(text=f"Nova versão encontrada: {versao_remota}. Baixando...", fg="#38BDF8")
-                self.baixar_pacotes(arquivos_necessarios, dados_remotos)
+            if versao_remota != versao_local or alguem_faltando:
+                self.lbl_status.config(text="Atualizando arquivos do sistema...")
+                self.baixar_arquivos(arquivos_necessarios, dados_remotos)
             else:
-                self.lbl_status.config(text="Sistema atualizado!", fg="#10B981")
-                self.root.after(1000, self.finalizar_e_abrir)
+                self.iniciar_sistema()
 
         except Exception as e:
-            messagebox.showwarning("Modo Offline", f"Não foi possível conectar ao servidor.\nIniciando versão local...\nErro: {e}")
-            self.finalizar_e_abrir()
+            # Se der erro de internet, tenta abrir o que já existe localmente
+            if os.path.exists(EXECUTAVEL_FINAL):
+                self.iniciar_sistema()
+            else:
+                messagebox.showerror("Erro", f"Falha na primeira instalação.\nVerifique sua internet.\nErro: {e}")
+                self.root.destroy()
 
-    def baixar_pacotes(self, lista_arquivos, manifesto_completo):
-        self.progress["maximum"] = len(lista_arquivos)
-        
-        for i, arquivo in enumerate(lista_arquivos):
-            self.lbl_status.config(text=f"Baixando: {arquivo}...")
+    def baixar_arquivos(self, lista, manifesto):
+        self.progress["maximum"] = len(lista)
+        for i, arquivo in enumerate(lista):
+            self.lbl_status.config(text=f"Baixando: {arquivo}")
             self.root.update()
             
-            url_download = URL_BASE_ARQUIVOS + arquivo
-            caminho_destino = os.path.join(PASTA_SISTEMA, arquivo)
+            r = requests.get(URL_BASE_ARQUIVOS + arquivo, verify=False)
+            if r.status_code == 200:
+                with open(os.path.join(PASTA_SISTEMA, arquivo), 'wb') as f:
+                    f.write(r.content)
             
-            # Garante que as subpastas existam
-            os.makedirs(os.path.dirname(caminho_destino), exist_ok=True)
-            
-            # Download do arquivo
-            try:
-                r = requests.get(url_download, stream=True)
-                if r.status_code == 200:
-                    with open(caminho_destino, 'wb') as f:
-                        for chunk in r.iter_content(chunk_size=8192):
-                            f.write(chunk)
-                
-                self.progress["value"] = i + 1
-            except:
-                messagebox.showerror("Erro", f"Erro ao baixar {arquivo}")
-                return
+            self.progress["value"] = i + 1
 
-        # Atualiza o manifesto local após sucesso
+        # Salva a nova versão localmente
         with open(ARQUIVO_LOCAL_VERSAO, 'w') as f:
-            json.dump(manifesto_completo, f)
+            json.dump(manifesto, f)
         
-        self.lbl_status.config(text="Atualização concluída!", fg="#10B981")
-        self.root.after(1000, self.finalizar_e_abrir)
+        self.iniciar_sistema()
 
-    def finalizar_e_abrir(self):
+    def iniciar_sistema(self):
+        self.lbl_status.config(text="Iniciando...")
+        self.root.update()
         if os.path.exists(EXECUTAVEL_FINAL):
-            # Inicia o seu código original
-            subprocess.Popen([sys.executable, EXECUTAVEL_FINAL], cwd=PASTA_SISTEMA)
+            # Abre o executável na pasta correta
+            subprocess.Popen([EXECUTAVEL_FINAL], cwd=PASTA_SISTEMA)
             self.root.destroy()
         else:
-            messagebox.showerror("Erro", "Arquivo principal não encontrado mesmo após atualização!")
+            messagebox.showerror("Erro", "Arquivo principal não encontrado!")
             self.root.destroy()
 
 if __name__ == "__main__":
