@@ -1,4 +1,7 @@
 {
-  "version": "1.0.0",
-  "files": ["main.exe"]
+  "version": "1.0.3",
+  "files": [
+    "main.exe",
+    "dados_nfe.db"
+  ]
 }
