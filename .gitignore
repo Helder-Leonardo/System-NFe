@@ -1,0 +1,17 @@
+dados_nfe.db
+*.db
+*.db-wal
+*.db-shm
+serviceAccountKey.json
+client_secret*.json
+token*.pickle
+token*.json
+admin.dat
+brudam_cookie.txt
+brudam_login.dat
+coordenadas.json
+atualizacao_estado.json
+log_*.txt
+*.log
+__pycache__/
+*.pyc
