@@ -1,7 +1,1 @@
-{
-  "version": "1.0.3",
-  "files": [
-    "main.exe",
-    "dados_nfe.db"
-  ]
-}
+{"version": "1.0.5", "files": ["main.exe"]}
